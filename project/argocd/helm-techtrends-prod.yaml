@@ -16,4 +16,7 @@ spec:
     repoURL: https://github.com/iLem0n/nd064_course_1
     targetRevision: HEAD
   # Sync policy
-  syncPolicy: {}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
