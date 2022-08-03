@@ -40,16 +40,13 @@
       k8s:
         api_version: v1
         kind: Namespace
-        name: sandbox
+        name: "{{ item }}"
         state: present
-
-
-    - name: Create argocd namespace
-      k8s:
-        api_version: v1
-        kind: Namespace
-        name: argocd
-        state: present
+      with_items:
+        - argocd
+        - sandbox
+        - staging
+        - prod     
 
     - name: download argocd manifest
       get_url:
@@ -92,3 +89,22 @@
               app.kubernetes.io/name: argocd-server
             sessionAffinity: None
             type: NodePort
+    
+    - name: Copy ArgoCD Application files
+      copy: 
+        src: argocd
+        dest: /tmp
+        owner: vagrant
+        group: vagrant
+        mode: '0644'
+
+
+    - name: ArgoCD staging Application
+      k8s: 
+        src: /tmp/argocd/helm-techtrends-staging.yaml
+        state: present
+
+    - name: ArgoCD prod Application
+      k8s: 
+        src: /tmp/argocd/helm-techtrends-prod.yaml
+        state: present
