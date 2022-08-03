@@ -1,0 +1,94 @@
+---
+- name: provision techtrends
+  hosts: all
+
+  collections:    
+    - kubernetes.core
+
+  tasks:
+    - name: Install python packages
+      become: yes
+      pip:
+        name: 
+          - kubernetes         
+    
+    - name: Install k3s
+      become: yes
+      shell: curl -sfL https://get.k3s.io | sh -
+
+    - name: Ensure k3s is running state
+      service:
+        name: k3s 
+        state: started
+
+    - name: Create Kube Config dir 
+      file:
+        dest: /home/vagrant/.kube
+        state: directory  
+
+    - name: Copy Kube Config 
+      become: yes
+      copy: 
+        remote_src: yes
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: /home/vagrant/.kube/config 
+        owner: vagrant
+        group: vagrant
+        mode: '0700'
+
+    - name: Create sandbox namespace
+      k8s:
+        api_version: v1
+        kind: Namespace
+        name: sandbox
+        state: present
+
+
+    - name: Create argocd namespace
+      k8s:
+        api_version: v1
+        kind: Namespace
+        name: argocd
+        state: present
+
+    - name: download argocd manifest
+      get_url:
+        url: https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+        dest: /tmp/argocd.yaml
+        mode: '0664'
+
+    - name: apply argocd manifest
+      k8s:
+        state: present       
+        namespace: argocd
+        src: /tmp/argocd.yaml
+
+    - name: Create nodePort service 
+      k8s:
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            annotations:
+            labels:
+              app.kubernetes.io/component: server
+              app.kubernetes.io/name: argocd-server
+              app.kubernetes.io/part-of: argocd
+            name: argocd-server-nodeport
+            namespace: argocd
+          spec:
+            ports:
+            - name: http
+              port: 80
+              protocol: TCP
+              targetPort: 8080
+              nodePort: 30007
+            - name: https
+              port: 443
+              protocol: TCP
+              targetPort: 8080
+              nodePort: 30008
+            selector:
+              app.kubernetes.io/name: argocd-server
+            sessionAffinity: None
+            type: NodePort
